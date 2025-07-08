@@ -25,6 +25,11 @@ from tradingagents.default_config import DEFAULT_CONFIG
 from cli.models import AnalystType
 from cli.utils import *
 
+from set_api_keys import set_api_keys, set_http_proxy
+
+set_api_keys()
+set_http_proxy()
+
 console = Console()
 
 app = typer.Typer(
@@ -761,11 +766,14 @@ def run_analysis():
         func = getattr(obj, func_name)
         @wraps(func)
         def wrapper(*args, **kwargs):
-            func(*args, **kwargs)
+            # First, call the original function to update the buffer
+            result = func(*args, **kwargs)
+            # Then, save the latest message to the log file
             timestamp, message_type, content = obj.messages[-1]
             content = content.replace("\n", " ")  # Replace newlines with spaces
-            with open(log_file, "a") as f:
+            with open(log_file, "a", encoding="utf-8") as f:
                 f.write(f"{timestamp} [{message_type}] {content}\n")
+            return result
         return wrapper
     
     def save_tool_call_decorator(obj, func_name):
@@ -775,7 +783,7 @@ def run_analysis():
             func(*args, **kwargs)
             timestamp, tool_name, args = obj.tool_calls[-1]
             args_str = ", ".join(f"{k}={v}" for k, v in args.items())
-            with open(log_file, "a") as f:
+            with open(log_file, "a", encoding="utf-8") as f:
                 f.write(f"{timestamp} [Tool Call] {tool_name}({args_str})\n")
         return wrapper
 
@@ -788,7 +796,7 @@ def run_analysis():
                 content = obj.report_sections[section_name]
                 if content:
                     file_name = f"{section_name}.md"
-                    with open(report_dir / file_name, "w") as f:
+                    with open(report_dir / file_name, "w", encoding="utf-8") as f:
                         f.write(content)
         return wrapper
 
@@ -848,18 +856,16 @@ def run_analysis():
                 # Get the last message from the chunk
                 last_message = chunk["messages"][-1]
 
-                # Extract message content and type
                 if hasattr(last_message, "content"):
-                    content = extract_content_string(last_message.content)  # Use the helper function
+                    content = extract_content_string(last_message.content)
                     msg_type = "Reasoning"
                 else:
                     content = str(last_message)
                     msg_type = "System"
 
-                # Add message to buffer
                 message_buffer.add_message(msg_type, content)                
 
-                # If it's a tool call, add it to tool calls
+                # tool call 记录前会有一条空的reasoning记录
                 if hasattr(last_message, "tool_calls"):
                     for tool_call in last_message.tool_calls:
                         # Handle both dictionary and object tool calls

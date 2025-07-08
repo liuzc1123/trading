@@ -144,8 +144,8 @@ class Toolkit:
     @tool
     def get_YFin_data_online(
         symbol: Annotated[str, "ticker symbol of the company"],
-        start_date: Annotated[str, "Start date in yyyy-mm-dd format"],
-        end_date: Annotated[str, "End date in yyyy-mm-dd format"],
+        start_date: Annotated[str, "Start date in yyyy-mm-dd format, inclusive"],
+        end_date: Annotated[str, "End date in yyyy-mm-dd format, exclusive (data returned up to but not including this date, as per Yahoo Finance API)"],
     ) -> str:
         """
         Retrieve the stock price data for a given ticker symbol from Yahoo Finance.
@@ -169,7 +169,7 @@ class Toolkit:
             str, "technical indicator to get the analysis and report of"
         ],
         curr_date: Annotated[
-            str, "The current trading date you are trading on, YYYY-mm-dd"
+            str, "The current trading date you are trading on, YYYY-mm-dd. If this date is not a trading day (e.g., weekend, holiday, or future date), the function will automatically return the indicator for the most recent previous trading day with available data, and the returned value will indicate the actual date used."
         ],
         look_back_days: Annotated[int, "how many days to look back"] = 30,
     ) -> str:
@@ -178,10 +178,10 @@ class Toolkit:
         Args:
             symbol (str): Ticker symbol of the company, e.g. AAPL, TSM
             indicator (str): Technical indicator to get the analysis and report of
-            curr_date (str): The current trading date you are trading on, YYYY-mm-dd
+            curr_date (str): The current trading date you are trading on, YYYY-mm-dd. If this date is not a trading day (e.g., weekend, holiday, or future date), the function will automatically return the indicator for the most recent previous trading day with available data, and the returned value will indicate the actual date used.
             look_back_days (int): How many days to look back, default is 30
         Returns:
-            str: A formatted dataframe containing the stock stats indicators for the specified ticker symbol and indicator.
+            str: A formatted dataframe containing the stock stats indicators for the specified ticker symbol and indicator. If curr_date is not a trading day, the result will include the actual date of the data used.
         """
 
         result_stockstats = interface.get_stock_stats_indicators_window(
@@ -198,7 +198,7 @@ class Toolkit:
             str, "technical indicator to get the analysis and report of"
         ],
         curr_date: Annotated[
-            str, "The current trading date you are trading on, YYYY-mm-dd"
+            str, "The current trading date you are trading on, YYYY-mm-dd. If this date is not a trading day (e.g., weekend, holiday, or future date), the function will automatically return the indicator for the most recent previous trading day with available data, and the returned value will indicate the actual date used."
         ],
         look_back_days: Annotated[int, "how many days to look back"] = 30,
     ) -> str:
@@ -207,10 +207,10 @@ class Toolkit:
         Args:
             symbol (str): Ticker symbol of the company, e.g. AAPL, TSM
             indicator (str): Technical indicator to get the analysis and report of
-            curr_date (str): The current trading date you are trading on, YYYY-mm-dd
+            curr_date (str): The current trading date you are trading on, YYYY-mm-dd. If this date is not a trading day (e.g., weekend, holiday, or future date), the function will automatically return the indicator for the most recent previous trading day with available data, and the returned value will indicate the actual date used.
             look_back_days (int): How many days to look back, default is 30
         Returns:
-            str: A formatted dataframe containing the stock stats indicators for the specified ticker symbol and indicator.
+            str: A formatted dataframe containing the stock stats indicators for the specified ticker symbol and indicator. If curr_date is not a trading day, the result will include the actual date of the data used.
         """
 
         result_stockstats = interface.get_stock_stats_indicators_window(

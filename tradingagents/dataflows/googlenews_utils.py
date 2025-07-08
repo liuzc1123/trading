@@ -57,8 +57,9 @@ def getNewsData(query, start_date, end_date):
     page = 0
     while True:
         offset = page * 10
+        # todo: 考虑增强query + company_name, query + exchange, 函数入口增加变量
         url = (
-            f"https://www.google.com/search?q={query}"
+            f"https://www.google.com/search?q={query} company"
             f"&tbs=cdr:1,cd_min:{start_date},cd_max:{end_date}"
             f"&tbm=nws&start={offset}"
         )

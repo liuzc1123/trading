@@ -423,7 +423,7 @@ def get_stock_stats_indicators_window(
     symbol: Annotated[str, "ticker symbol of the company"],
     indicator: Annotated[str, "technical indicator to get the analysis and report of"],
     curr_date: Annotated[
-        str, "The current trading date you are trading on, YYYY-mm-dd"
+        str, "The current trading date you are trading on, YYYY-mm-dd. If no data for the date, will use the latest available data."
     ],
     look_back_days: Annotated[int, "how many days to look back"],
     online: Annotated[bool, "to fetch data online or offline"],
@@ -559,7 +559,7 @@ def get_stockstats_indicator(
     symbol: Annotated[str, "ticker symbol of the company"],
     indicator: Annotated[str, "technical indicator to get the analysis and report of"],
     curr_date: Annotated[
-        str, "The current trading date you are trading on, YYYY-mm-dd"
+        str, "The current trading date you are trading on, YYYY-mm-dd. If no data for the date, will use the latest available data."
     ],
     online: Annotated[bool, "to fetch data online or offline"],
 ) -> str:
@@ -627,8 +627,8 @@ def get_YFin_data_window(
 
 def get_YFin_data_online(
     symbol: Annotated[str, "ticker symbol of the company"],
-    start_date: Annotated[str, "Start date in yyyy-mm-dd format"],
-    end_date: Annotated[str, "End date in yyyy-mm-dd format"],
+    start_date: Annotated[str, "Start date in yyyy-mm-dd format, inclusive"],
+    end_date: Annotated[str, "End date in yyyy-mm-dd format, exclusive (data returned up to but not including this date)"],
 ):
 
     datetime.strptime(start_date, "%Y-%m-%d")
@@ -707,6 +707,7 @@ def get_stock_news_openai(ticker, curr_date):
     client = OpenAI(base_url=config["backend_url"])
 
     response = client.responses.create(
+        #todo only for American stocks now
         model=config["quick_think_llm"],
         input=[
             {
@@ -714,7 +715,8 @@ def get_stock_news_openai(ticker, curr_date):
                 "content": [
                     {
                         "type": "input_text",
-                        "text": f"Can you search Social Media for {ticker} from 7 days before {curr_date} to {curr_date}? Make sure you only get the data posted during that period.",
+                        #"text": f"Can you search Social Media for {ticker} from 7 days before {curr_date} to {curr_date}? Make sure you only get the data posted during that period.",
+                        "text": f"Can you search Social Media for posts related to the stock company with ticker symbol {ticker}, from 7 days before {curr_date} to {curr_date}? Make sure you only get the data posted during that period.",
                     }
                 ],
             }
@@ -784,7 +786,7 @@ def get_fundamentals_openai(ticker, curr_date):
                 "content": [
                     {
                         "type": "input_text",
-                        "text": f"Can you search Fundamental for discussions on {ticker} during of the month before {curr_date} to the month of {curr_date}. Make sure you only get the data posted during that period. List as a table, with PE/PS/Cash flow/ etc",
+                        "text": f"Can you search Fundamental for discussions on the stock company with ticker symbol {ticker} during the month before {curr_date} to the month of {curr_date}? Make sure you only get the data posted during that period. List as a table, with PE/PS/Cash flow/ etc",
                     }
                 ],
             }

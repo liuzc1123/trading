@@ -14,7 +14,7 @@ class StockstatsUtils:
             str, "quantitative indicators based off of the stock data for the company"
         ],
         curr_date: Annotated[
-            str, "curr date for retrieving stock price data, YYYY-mm-dd"
+            str, "curr date for retrieving stock price data, YYYY-mm-dd. If no data for the date, will use the latest available data."
         ],
         data_dir: Annotated[
             str,
@@ -83,5 +83,13 @@ class StockstatsUtils:
         if not matching_rows.empty:
             indicator_value = matching_rows[indicator].values[0]
             return indicator_value
+        
+        # if no stats for the date, find a latest day with valid stats
+        available_dates = df["Date"].sort_values()
+        prev_dates = available_dates[available_dates < curr_date]
+        if not prev_dates.empty:
+            latest_date = prev_dates.iloc[-1]
+            indicator_value = df[df["Date"] == latest_date][indicator].values[0]
+            return f"{indicator_value} (from {latest_date}, last available trading day)"
         else:
             return "N/A: Not a trading day (weekend or holiday)"
