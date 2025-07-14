@@ -73,10 +73,10 @@ def test_online():
     except Exception as e:
         print("get_google_news Exception:", e)
     try:
-        result = Toolkit.get_stock_news_openai.invoke({"ticker": "AAPL", "curr_date": "2023-12-31"})
-        print("get_stock_news_openai:", result[:500], "...\n" if isinstance(result, str) else result)
+        result = Toolkit.get_social_sentiment_openai.invoke({"ticker": "AAPL", "curr_date": "2023-12-31"})
+        print("get_social_sentiment_openai:", result[:500], "...\n" if isinstance(result, str) else result)
     except Exception as e:
-        print("get_stock_news_openai Exception:", e)
+        print("get_social_sentiment_openai Exception:", e)
     try:
         result = Toolkit.get_global_news_openai.invoke({"curr_date": "2023-12-31"})
         print("get_global_news_openai:", result[:500], "...\n" if isinstance(result, str) else result)

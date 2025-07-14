@@ -1,5 +1,6 @@
 import time
 import json
+from langchain_core.messages import AIMessage
 
 
 def create_risky_debator(llm):
@@ -34,7 +35,7 @@ Engage actively by addressing any specific concerns raised, refuting the weaknes
 
         response = llm.invoke(prompt)
 
-        argument = f"Risky Analyst: {response.content}"
+        argument = f"### Risky Analyst\n{response.content}"
 
         new_risk_debate_state = {
             "history": history + "\n" + argument,
@@ -50,6 +51,12 @@ Engage actively by addressing any specific concerns raised, refuting the weaknes
             "count": risk_debate_state["count"] + 1,
         }
 
-        return {"risk_debate_state": new_risk_debate_state}
+        # Create AI message for logging and display
+        ai_message = AIMessage(content=response.content)
+
+        return {
+            "risk_debate_state": new_risk_debate_state,
+            "messages": [ai_message]
+        }
 
     return risky_node

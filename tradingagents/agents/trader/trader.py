@@ -1,5 +1,4 @@
 import functools
-import time
 import json
 
 
@@ -12,27 +11,69 @@ def create_trader(llm, memory):
         news_report = state["news_report"]
         fundamentals_report = state["fundamentals_report"]
 
-        curr_situation = f"{market_research_report}\n\n{sentiment_report}\n\n{news_report}\n\n{fundamentals_report}"
-        past_memories = memory.get_memories(curr_situation, n_matches=2)
+        # 当前情境：用于 memory 检索（若 memory 暂未实现可忽略）
+        curr_situation = (
+            f"Market Research:\n{market_research_report}\n\n"
+            f"Sentiment:\n{sentiment_report}\n\n"
+            f"News:\n{news_report}\n\n"
+            f"Fundamentals:\n{fundamentals_report}"
+        )
+        past_memories = memory.get_memories(curr_situation, n_matches=2) if memory else []
 
-        past_memory_str = ""
         if past_memories:
-            for i, rec in enumerate(past_memories, 1):
-                past_memory_str += rec["recommendation"] + "\n\n"
+            past_memory_str = "\n\n".join(rec.get("recommendation", "") for rec in past_memories)
         else:
-            past_memory_str = "No past memories found."
+            past_memory_str = "No relevant past memories."
 
-        context = {
-            "role": "user",
-            "content": f"Based on a comprehensive analysis by a team of analysts, here is an investment plan tailored for {company_name}. This plan incorporates insights from current technical market trends, macroeconomic indicators, and social media sentiment. Use this plan as a foundation for evaluating your next trading decision.\n\nProposed Investment Plan: {investment_plan}\n\nLeverage these insights to make an informed and strategic decision.",
-        }
+        # ============ Prompt ============
+        system_prompt = (
+            "You are a professional trading agent responsible for turning research outputs into actionable "
+            "trading instructions. Analyse the provided information and output a concise, structured decision.\n\n"
+            "You MUST respond strictly in the following JSON format:\n"
+            "```json\n"
+            "{\n"
+            "  \"decision\": \"BUY|HOLD|SELL\",\n"
+            "  \"confidence\": 0-100,                 /* integer */\n"
+            "  \"rationale\": \"<max 520 words>\",\n"
+            "  \"execution_plan\": \"<max 280 words>\"\n"
+            "}\n"
+            "```\n\n"
+            "After the JSON block, append exactly one line in the form:\n"
+            "FINAL TRANSACTION PROPOSAL: **<BUY/HOLD/SELL>**\n\n"
+            "Leverage the \"Past Reflections\" section to avoid repeating previous mistakes."
+        )
 
+        user_prompt = (
+            f"### Company of interest\n{company_name}\n\n"
+            f"### Proposed investment plan (research team)\n{investment_plan}\n\n"
+            f"### Current market snapshot (trimmed)\n"
+            f"- Market: {market_research_report[:500]}...\n"
+            f"- Sentiment: {sentiment_report[:500]}...\n"
+            f"- News: {news_report[:500]}...\n"
+            f"- Fundamentals: {fundamentals_report[:500]}...\n\n"
+            f"### Past reflections\n{past_memory_str}"
+        )
+        # context = {
+        #     "role": "user",
+        #     "content": f"Based on a comprehensive analysis by a team of analysts, here is an investment plan 
+        #     tailored for {company_name}. This plan incorporates insights from current technical market trends, 
+        #     macroeconomic indicators, and social media sentiment. Use this plan as a foundation for evaluating 
+        #     your next trading decision.\n\nProposed Investment Plan: {investment_plan}\n\nLeverage these insights 
+        #     to make an informed and strategic decision.",
+        # }
         messages = [
-            {
-                "role": "system",
-                "content": f"""You are a trading agent analyzing market data to make investment decisions. Based on your analysis, provide a specific recommendation to buy, sell, or hold. End with a firm decision and always conclude your response with 'FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL**' to confirm your recommendation. Do not forget to utilize lessons from past decisions to learn from your mistakes. Here is some reflections from similar situatiosn you traded in and the lessons learned: {past_memory_str}""",
-            },
-            context,
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+            # {
+            #     "role": "system",
+            #     "content": f"""You are a trading agent analyzing market data to make investment decisions. Based 
+            #     on your analysis, provide a specific recommendation to buy, sell, or hold. End with a firm 
+            #     decision and always conclude your response with 'FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL**' to 
+            #     confirm your recommendation. Do not forget to utilize lessons from past decisions to learn from 
+            #     your mistakes. Here is some reflections from similar situatiosn you traded in and the lessons 
+            #     learned: {past_memory_str}""",
+            # },
+            # context,
         ]
 
         result = llm.invoke(messages)

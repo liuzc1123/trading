@@ -9,7 +9,14 @@ from typing import Dict, Any, Tuple, List, Optional
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_deepseek import ChatDeepSeek
+
+# 可选导入deepseek
+try:
+    from langchain_deepseek import ChatDeepSeek
+    DEEPSEEK_AVAILABLE = True
+except ImportError:
+    DEEPSEEK_AVAILABLE = False
+    ChatDeepSeek = None
 
 from langgraph.prebuilt import ToolNode
 
@@ -69,6 +76,8 @@ class TradingAgentsGraph:
             self.deep_thinking_llm = ChatGoogleGenerativeAI(model=self.config["deep_think_llm"])
             self.quick_thinking_llm = ChatGoogleGenerativeAI(model=self.config["quick_think_llm"])
         elif self.config["llm_provider"].lower() == "deepseek":
+            if not DEEPSEEK_AVAILABLE:
+                raise ValueError("DeepSeek provider requested but langchain_deepseek is not installed")
             self.deep_thinking_llm = ChatDeepSeek(model=self.config["deep_think_llm"])
             self.quick_thinking_llm = ChatDeepSeek(model=self.config["quick_think_llm"])
         else:
@@ -87,7 +96,7 @@ class TradingAgentsGraph:
         self.tool_nodes = self._create_tool_nodes()
 
         # Initialize components
-        self.conditional_logic = ConditionalLogic()
+        self.conditional_logic = ConditionalLogic(max_debate_rounds=config["max_debate_rounds"], max_risk_discuss_rounds=config["max_risk_discuss_rounds"])
         self.graph_setup = GraphSetup(
             self.quick_thinking_llm,
             self.deep_thinking_llm,
@@ -129,7 +138,7 @@ class TradingAgentsGraph:
             "social": ToolNode(
                 [
                     # online tools
-                    self.toolkit.get_stock_news_openai,
+                    self.toolkit.get_social_sentiment_openai,
                     # offline tools
                     self.toolkit.get_reddit_stock_info,
                 ]
@@ -138,6 +147,7 @@ class TradingAgentsGraph:
                 [
                     # online tools
                     self.toolkit.get_global_news_openai,
+                    self.toolkit.get_company_news_openai,
                     self.toolkit.get_google_news,
                     # offline tools
                     self.toolkit.get_finnhub_news,
@@ -148,6 +158,7 @@ class TradingAgentsGraph:
                 [
                     # online tools
                     self.toolkit.get_fundamentals_openai,
+                    self.toolkit.get_company_profile_openai,
                     # offline tools
                     self.toolkit.get_finnhub_company_insider_sentiment,
                     self.toolkit.get_finnhub_company_insider_transactions,

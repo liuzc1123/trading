@@ -702,9 +702,46 @@ def get_YFin_data(
     return filtered_data
 
 
-def get_stock_news_openai(ticker, curr_date):
+def get_social_sentiment_openai(ticker, curr_date):
     config = get_config()
     client = OpenAI(base_url=config["backend_url"])
+
+    from datetime import datetime, timedelta
+    if isinstance(curr_date, str):
+        curr_date_dt = datetime.strptime(curr_date, "%Y-%m-%d")
+    else:
+        curr_date_dt = curr_date
+    start_date = (curr_date_dt - timedelta(days=7)).strftime("%Y-%m-%d")
+    end_date = curr_date_dt.strftime("%Y-%m-%d")
+
+    prompt = f"""
+You are a social media narrative analyst bot. Your sole task is to use the web search tool to identify and summarize the dominant public narratives about {ticker} from {start_date} to {end_date}.
+
+CRITICAL INSTRUCTIONS:
+1.  Search on sources like Twitter/X, Reddit, StockTwits, etc.
+2.  Your primary goal is to identify the **main reasons** people are bullish or bearish.
+3.  For each distinct narrative (e.g., "excitement about AI chip," "concern over competition"), create a single entry in the table.
+4.  Provide a rough estimate of how prevalent each narrative is (e.g., High, Medium, Low).
+5.  Do NOT invent quantitative scores. Do NOT include official company news. Focus ONLY on public discourse.
+
+The output format must be this exact markdown table:
+
+| Type | Dominant Narrative/Theme | Prevalence | Representative Post Summary |
+|---|---|---|---|
+| Bullish | [The most common positive theme] | [e.g., High] | [A brief summary of a popular post supporting this theme] |
+| Bullish | [A second distinct positive theme] | [e.g., Medium] | [A brief summary of a popular post supporting this theme] |
+| Bearish | [The most common negative theme] | [e.g., High] | [A brief summary of a popular post supporting this theme] |
+"""
+
+# """You are a professional financial news and social sentiment analyst.
+# Please search for recent posts and discussions related to the stock company with ticker symbol {ticker}, published from 
+# {start_date} up to {end_date}, only from reputable social media and financial community sources such as Twitter, 
+# StockTwits, Reddit, Seeking Alpha, and Yahoo Finance discussion boards.
+# Focus on posts that discuss company news, earnings, rumors, analyst opinions, and significant market sentiment shifts.
+# Present the results in a markdown table with columns: Date, Platform, Author (if available), Headline or Main Point, 
+# Summary, and Link.
+# Only include posts published within the specified period. Rank the posts by potential trading impact, and cite the 
+# source for each entry."""
 
     response = client.responses.create(
         #todo only for American stocks now
@@ -716,7 +753,7 @@ def get_stock_news_openai(ticker, curr_date):
                     {
                         "type": "input_text",
                         #"text": f"Can you search Social Media for {ticker} from 7 days before {curr_date} to {curr_date}? Make sure you only get the data posted during that period.",
-                        "text": f"Can you search Social Media for posts related to the stock company with ticker symbol {ticker}, from 7 days before {curr_date} to {curr_date}? Make sure you only get the data posted during that period.",
+                        "text": prompt,
                     }
                 ],
             }
@@ -726,11 +763,16 @@ def get_stock_news_openai(ticker, curr_date):
         tools=[
             {
                 "type": "web_search_preview",
-                "user_location": {"type": "approximate"},
-                "search_context_size": "low",
+                # "user_location": {"type": "approximate"},
+                "search_context_size": "medium",  # low/medium/high
+                # 更精准可控 "time_range": {"start": "2024-06-01", "end": "2024-06-07"}
+                # language
+                # max_results
+                # region
+                # custom_query 自定义关键词
             }
         ],
-        temperature=1,
+        temperature=0.7,
         max_output_tokens=4096,
         top_p=1,
         store=True,
@@ -739,9 +781,114 @@ def get_stock_news_openai(ticker, curr_date):
     return response.output[1].content[0].text
 
 
-def get_global_news_openai(curr_date):
+def get_company_news_openai(ticker, curr_date):
     config = get_config()
     client = OpenAI(base_url=config["backend_url"])
+
+    from datetime import datetime, timedelta
+
+    if isinstance(curr_date, str):
+        curr_date_dt = datetime.strptime(curr_date, "%Y-%m-%d")
+    else:
+        curr_date_dt = curr_date
+    start_date = (curr_date_dt - timedelta(days=14)).strftime("%Y-%m-%d")
+    end_date = curr_date_dt.strftime("%Y-%m-%d")
+
+    prompt = f"""
+You are an automated news extraction bot. Your sole task is to use the web search tool to find and categorize company-specific news for {ticker}, published from {start_date} up to {end_date}.
+
+CRITICAL INSTRUCTIONS:
+1.  Search for factual news ONLY within these specific categories:
+    - Earnings & Financials (Results, Guidance, Analyst Ratings)
+    - Products & Services (Launches, R&D News)
+    - Management & Operations (Executive changes, Layoffs)
+    - Legal, Regulatory & M&A
+2.  Do NOT include social media discussions, rumors, or sentiment analysis. Focus on official news from reputable financial media.
+3.  For each piece of news found, present it as a single line in a markdown table.
+4.  Do NOT add any commentary, analysis, ranking, or opinions. Report the facts only.
+5.  If no significant news is found for a category, omit it from the table.
+
+The output format must be this exact markdown table:
+
+| Category | Headline | Summary |
+|---|---|---|
+| [e.g., Earnings] | [Headline of the news] | [A brief, factual summary of the news content] |
+| [e.g., Products] | [Headline of the news] | [A brief, factual summary of the news content] |
+"""
+
+    response = client.responses.create(
+        model=config["quick_think_llm"],
+        input=[
+            {
+                "role": "system",
+                "content": [{"type": "input_text", "text": prompt}],
+            }
+        ],
+        text={"format": {"type": "text"}},
+        reasoning={},
+        tools=[{"type": "web_search_preview", "search_context_size": "medium"}],
+        temperature=0.7,
+        max_output_tokens=4096,
+        top_p=1,
+        store=True,
+    )
+
+    return response.output[1].content[0].text
+
+
+def get_global_news_openai(curr_date, ticker):
+    config = get_config()
+    client = OpenAI(base_url=config["backend_url"])
+
+    # 计算时间范围
+    from datetime import datetime, timedelta
+    if isinstance(curr_date, str):
+        curr_date = datetime.strptime(curr_date, "%Y-%m-%d")
+    start_date = (curr_date - timedelta(days=7)).strftime("%Y-%m-%d")
+    end_date = curr_date.strftime("%Y-%m-%d")
+
+    prompt = f"""
+    You are a professional macroeconomic news extraction assistant.
+
+Your task is to:
+1. Identify the company name and main industry sector from the ticker symbol: **{ticker}**
+2. Then, extract major macroeconomic and industry-related news between **{start_date} and {end_date}** that may affect this company or its sector globally.
+
+
+### CRITICAL INSTRUCTIONS:
+
+1. Use reliable financial and economic sources only (e.g., Investing.com, Reuters, WSJ, CNBC, Yahoo Finance, central bank releases).
+
+2. Search in two areas:
+#### (A) Global Macro News
+Cover only **major developments** in:
+   - Central bank policy (interest rates, QE/QT, guidance)
+   - Key economic indicators (CPI, GDP, employment, PMI, etc.)
+   - Geopolitical events (wars, trade tensions, sanctions)
+   - Global sector-wide trends (e.g., oil demand, supply chain, AI chip bans)
+#### (B) Sector/Industry-Specific News
+After identifying the company and its sector:
+   - Regulatory or policy changes affecting the industry
+   - Major technological breakthroughs or shifts
+   - Cross-border M&A or joint ventures in the industry
+   - News involving competitors with systemic impact
+
+2.  For each piece of news found, present it as a single line in a markdown table.
+3.  Do NOT add any commentary, analysis, ranking, or opinions. Report the facts only.
+4.  If no significant news is found for a category, omit it from the table.
+5.  Each news item must be:
+   - Real and published between **{start_date} and {end_date}**
+   - Summarized in **2 sentence max** with no opinions
+   - Verified from credible sources
+
+---
+
+### OUTPUT FORMAT (Markdown Table Only):
+| Category | Headline | Summary |
+|---|---|---|
+| [e.g., Central Banks] | [Headline of the news] | [A brief, factual summary of the news content] |
+| [e.g., Economic Data] | [Headline of the news] | [A brief, factual summary of the news content] |
+"""
 
     response = client.responses.create(
         model=config["quick_think_llm"],
@@ -751,7 +898,8 @@ def get_global_news_openai(curr_date):
                 "content": [
                     {
                         "type": "input_text",
-                        "text": f"Can you search global or macroeconomics news from 7 days before {curr_date} to {curr_date} that would be informative for trading purposes? Make sure you only get the data posted during that period.",
+                        #"text": f"Can you search global or macroeconomics news from 7 days before {curr_date} to {curr_date} that would be informative for trading purposes? Make sure you only get the data posted during that period.",
+                        "text": prompt
                     }
                 ],
             }
@@ -761,11 +909,11 @@ def get_global_news_openai(curr_date):
         tools=[
             {
                 "type": "web_search_preview",
-                "user_location": {"type": "approximate"},
-                "search_context_size": "low",
+                # "user_location": {"type": "approximate"},
+                "search_context_size": "medium", #low/medium/high
             }
         ],
-        temperature=1,
+        temperature=0.4,
         max_output_tokens=4096,
         top_p=1,
         store=True,
@@ -786,7 +934,73 @@ def get_fundamentals_openai(ticker, curr_date):
                 "content": [
                     {
                         "type": "input_text",
-                        "text": f"Can you search Fundamental for discussions on the stock company with ticker symbol {ticker} during the month before {curr_date} to the month of {curr_date}? Make sure you only get the data posted during that period. List as a table, with PE/PS/Cash flow/ etc",
+                        # "text": f"Can you search Fundamental for discussions on the stock company with ticker symbol {ticker} during the month before {curr_date} to the month of {curr_date}? Make sure you only get the data posted during that period. List as a table, with PE/PS/Cash flow/ etc",
+                        "text": f"""
+You are an automated financial data extraction bot. Your sole task is to use the web search tool to find the most recent, key fundamental data points for the company with ticker symbol {ticker}
+
+IMPORTANT GUIDELINES:
+1.  Use these sources in priority: 
+   - Yahoo Finance (finance.yahoo.com) > Google Finance (finance.google.com) > Investing (www.investing.com/equities) > MarketWatch (marketwatch.com) > Reuters (reuters.com) > Company's official investor relations page
+2.  Use the most reliable source **for each metric individually**, do not restrict to one site.
+3.  Ensure all monetary values are in USD and use consistent formatting (e.g., $1.23B, $123.45M, $123.45).
+4.  Understand and interpret technical terms flexibly:
+   - TTM = trailing twelve months
+   - EV/EBITDA = Enterprise Value divided by EBITDA
+   - ROE = Return on Equity
+   - Insider Net Activity = Insider share activity in past 6 months
+   - Top Institutional Holder = Largest institutional shareholder, by ownership %
+5. If a metric is unavailable in table form, check:
+   - Earnings releases
+   - Company filings (10-K, 10-Q)
+   - “Statistics”, “Analysis”, or “Financials”
+6.  Output the result ONLY as a single, clean markdown table.
+7.  Do NOT include any explanation or commentary.
+8. Use "N/A" if a value is unavailable. Do not omit rows.
+9. Use the following keyword pairs during search, along with the company name or ticker symbol, to locate metrics more precisely:
+    - Market Cap: `"market capitalization"`, `"company value"`
+    - P/E Ratio: `"price to earnings ratio"`, `"PE (TTM)"`
+    - P/S Ratio: `"price to sales ratio"`, `"PS (TTM)"`
+    - EV/EBITDA: `"enterprise value to EBITDA"`, `"EV EBITDA multiple"`
+    - Gross Margin: `"gross margin percentage TTM"`
+    - Operating Margin: `"operating margin TTM"`, `"EBIT margin"`
+    - ROE: `"return on equity TTM"`
+    - Debt-to-Equity: `"debt to equity ratio MRQ"`, `"financial leverage"`
+    - Current Ratio: `"current ratio MRQ"`, `"liquidity ratio"`
+    - Revenue Growth: `"revenue growth YoY"`, `"year-over-year revenue"`
+    - EPS Growth: `"EPS growth YoY"`, `"earnings per share growth"`
+    - Operating Cash Flow: `"operating cash flow TTM"`, `"cash from operations"`
+    - Free Cash Flow: `"free cash flow TTM"`, `"FCF"`
+    - Dividend Yield: `"dividend yield"`, `"dividend per share"`
+    - Insider Activity: `"insider trading last 6 months"`, `"insider buys/sells summary"`
+    - Top Institutional Holder: `"largest institutional shareholder"`, `"top institutional owner"`
+
+    Use combined search patterns like:
+    - `"NVIDIA free cash flow TTM site:finance.yahoo.com"`
+    - `"TSLA EV/EBITDA MarketWatch"`
+    - `"AMD ROE TTM site:reuters.com"`
+
+--- 
+
+### Output Format (Markdown Table):
+| Category | Metric | Value |
+|---|---|---|
+| Valuation | Market Cap | [Value] |
+| Valuation | P/E Ratio (TTM) | [Value] |
+| Valuation | P/S Ratio (TTM) | [Value] |
+| Valuation | EV/EBITDA (TTM) | [Value] |
+| Profitability | Gross Margin (TTM) | [Value] |
+| Profitability | Operating Margin (TTM) | [Value] |
+| Profitability | Return on Equity (ROE, TTM) | [Value] |
+| Financial Health| Debt-to-Equity Ratio (MRQ) | [Value] |
+| Financial Health| Current Ratio (MRQ) | [Value] |
+| Growth | Revenue Growth (YoY) | [Value] |
+| Growth | EPS Growth (YoY) | [Value] |
+| Cash Flow | Operating Cash Flow (TTM) | [Value] |
+| Cash Flow | Free Cash Flow (TTM) | [Value] |
+| Dividends & Ownership | Dividend Yield | [Value] |
+| Dividends & Ownership | Insider Net Activity (6M) | [e.g., -150,000 shares sold] |
+| Dividends & Ownership | Top Institutional Holder | [e.g., Vanguard Group (8.5%)] |
+"""
                     }
                 ],
             }
@@ -796,14 +1010,99 @@ def get_fundamentals_openai(ticker, curr_date):
         tools=[
             {
                 "type": "web_search_preview",
-                "user_location": {"type": "approximate"},
-                "search_context_size": "low",
+                # "user_location": {"type": "approximate"},
+                "search_context_size": "medium",
+                #"max_results": 5,
+                #"custom_query": "site:reuters.com finance news",
+                #"time_range": {"start": "2024-06-01", "end": "2024-06-07"}
             }
         ],
-        temperature=1,
+        temperature=0.3,  # Lower temperature for more consistent results
         max_output_tokens=4096,
         top_p=1,
         store=True,
+    )
+
+    return response.output[1].content[0].text
+
+
+def get_company_profile_openai(ticker):
+    config = get_config()
+    client = OpenAI(base_url=config["backend_url"])
+
+    prompt = f"""
+You are a professional business analyst bot. Your task is to research and present a **clear, detailed, and structured summary** of the business model for the company with the ticker symbol {ticker}.
+
+CRITICAL INSTRUCTIONS:
+1. Use the web search tool to find the latest and most accurate business information. Prioritize sources in this order:
+   - Company’s official website and investor relations page
+   - Yahoo Finance (finance.yahoo.com)
+   - Google Finance (google.com/finance)
+   - MarketWatch (marketwatch.com)
+   - Reuters (reuters.com)
+   - Wikipedia (for well-established firms)
+2. The output format must follow this exact structure (in Markdown):
+    ## Company Overview
+        A concise 2-3 sentence description of what the company is and which industry it operates in.
+
+    ## Core Business Segments
+        - **Segment 1 Name**: Brief explanation of what this segment does.
+
+        - **Segment 2 Name**: [Only include if applicable]
+        (Up to 3 segments. If unknown, summarize main revenue drivers.)
+
+    ## Main Products or Services
+        Bullet list of 2–5 key products, services, or platforms the company offers (If applicable).
+
+    ## Revenue Model
+        Explain clearly how the company generates revenue.
+        Include key channels: e.g., subscription, product sales, licensing, advertising, transactions, data, platform fees, etc.
+
+    ## Customer Base
+        Describe the company’s main customer types (e.g., individual consumers, businesses, government).
+        Include regions served if relevant.
+
+    ## Business Strategy or Recent Developments (optional)
+        Briefly mention major strategic focus, growth areas, or recent pivots if available.
+3. You MUST address the following 3 points:
+   - The company’s primary business activities
+   - Its main products or services
+   - Its primary revenue sources and business model
+4. Do NOT include:
+   - Financial figures or valuation data
+   - Stock price commentary or investment advice
+   - Marketing or promotional language
+5. Maintain a neutral, formal tone using factual business language.
+6. If the company has multiple segments, emphasize the **most significant ones**.
+7. Use search phrases like:
+   - “[Company name] business model”
+   - “[Company name] revenue breakdown”
+   - “[Company name] what it does”
+   - “[Company name] investor relations business overview”
+8. When multiple sources provide overlapping or conflicting information, prioritize:
+   - The **most recently updated** source.
+   - Official company statements (IR, press releases) over third-party summaries.
+   - Wikipedia only if cross-referenced with other sources and considered current.
+
+9. If the publication date or last update of a source is visible, prefer content published within the **last 12 months**, especially for business segments or strategic changes.
+
+10. If a source appears outdated or promotional, deprioritize or discard it.
+"""
+
+    response = client.responses.create(
+        model=config["quick_think_llm"],
+        input=[
+            {
+                "role": "system",
+                "content": [{"type": "input_text", "text": prompt}],
+            }
+        ],
+        text={"format": {"type": "text"}},
+        reasoning={},
+        tools=[{"type": "web_search_preview", "search_context_size": "medium"}],
+        temperature=0.3,
+        max_output_tokens=4096,
+        top_p=1,
     )
 
     return response.output[1].content[0].text

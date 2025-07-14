@@ -96,8 +96,8 @@ def select_research_depth() -> int:
     # Define research depth options with their corresponding values
     DEPTH_OPTIONS = [
         ("Shallow - Quick research, few debate and strategy discussion rounds", 1),
-        ("Medium - Middle ground, moderate debate rounds and strategy discussion", 3),
-        ("Deep - Comprehensive research, in depth debate and strategy discussion", 5),
+        ("Medium - Middle ground, moderate debate rounds and strategy discussion", 2),
+        ("Deep - Comprehensive research, in depth debate and strategy discussion", 3),
     ]
 
     choice = questionary.select(
@@ -254,7 +254,7 @@ def select_llm_provider() -> tuple[str, str]:
         ("OpenAI", "https://api.openai.com/v1"),
         ("Anthropic", "https://api.anthropic.com/"),
         ("Google", "https://generativelanguage.googleapis.com/v1"),
-        ("DeepSeek", "https://api.deepseek.com/v1"),
+        ("DeepSeek", "https://api.openai.com/v1"),
         ("Openrouter", "https://openrouter.ai/api/v1"),
         ("Ollama", "http://localhost:11434/v1"),        
     ]
@@ -283,3 +283,22 @@ def select_llm_provider() -> tuple[str, str]:
     print(f"You selected: {display_name}\tURL: {url}")
     
     return display_name, url
+
+def extract_content_string(content):
+    """从各种消息格式中提取字符串内容"""
+    if isinstance(content, str):
+        return content
+    elif isinstance(content, list):
+        # 处理Anthropic的列表格式
+        text_parts = []
+        for item in content:
+            if isinstance(item, dict):
+                if item.get('type') == 'text':
+                    text_parts.append(item.get('text', ''))
+                elif item.get('type') == 'tool_use':
+                    text_parts.append(f"[Tool: {item.get('name', 'unknown')}]")
+            else:
+                text_parts.append(str(item))
+        return ' '.join(text_parts)
+    else:
+        return str(content)

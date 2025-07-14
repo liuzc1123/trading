@@ -357,26 +357,47 @@ class Toolkit:
             str: A formatted string containing the latest news from Google News based on the query and date range.
         """
 
-        google_news_results = interface.get_google_news(query, curr_date, 7)
+        google_news_results = interface.get_google_news(query, curr_date, 7) 
 
         return google_news_results
 
     @staticmethod
     @tool
-    def get_stock_news_openai(
+    def get_company_news_openai(
         ticker: Annotated[str, "the company's ticker"],
         curr_date: Annotated[str, "Current date in yyyy-mm-dd format"],
     ):
         """
-        Retrieve the latest news about a given stock by using OpenAI's news API.
+        Retrieves a markdown table of key company-specific news (e.g., earnings, products, management) in the past 14 days
+        for a given stock using an OpenAI web search tool.
         Args:
             ticker (str): Ticker of a company. e.g. AAPL, TSM
             curr_date (str): Current date in yyyy-mm-dd format
         Returns:
-            str: A formatted string containing the latest news about the company on the given date.
+            str: A markdown table containing categorized company-specific news.
         """
 
-        openai_news_results = interface.get_stock_news_openai(ticker, curr_date)
+        openai_news_results = interface.get_company_news_openai(ticker, curr_date)
+
+        return openai_news_results
+
+    @staticmethod
+    @tool
+    def get_social_sentiment_openai(
+        ticker: Annotated[str, "the company's ticker"],
+        curr_date: Annotated[str, "Current date in yyyy-mm-dd format"],
+    ):
+        """
+        Retrieves a markdown table of key company-specific news (e.g., earnings, products, management)
+        for a given stock using an OpenAI web search tool.
+        Args:
+            ticker (str): Ticker of a company. e.g. AAPL, TSM
+            curr_date (str): Current date in yyyy-mm-dd format
+        Returns:
+            str: A markdown table containing categorized company-specific news.
+        """
+
+        openai_news_results = interface.get_social_sentiment_openai(ticker, curr_date)
 
         return openai_news_results
 
@@ -384,16 +405,19 @@ class Toolkit:
     @tool
     def get_global_news_openai(
         curr_date: Annotated[str, "Current date in yyyy-mm-dd format"],
+        ticker: Annotated[str, "The company's ticker"],
     ):
         """
-        Retrieve the latest macroeconomics news on a given date using OpenAI's macroeconomics news API.
+        Retrieves a markdown table of key global macroeconomic news (e.g., central bank policy, economic data)
+        using an OpenAI web search tool.
         Args:
             curr_date (str): Current date in yyyy-mm-dd format
+            ticker (str): The company's ticker
         Returns:
-            str: A formatted string containing the latest macroeconomic news on the given date.
+            str: A markdown table containing categorized global macroeconomic news.
         """
 
-        openai_news_results = interface.get_global_news_openai(curr_date)
+        openai_news_results = interface.get_global_news_openai(curr_date, ticker)
 
         return openai_news_results
 
@@ -404,12 +428,17 @@ class Toolkit:
         curr_date: Annotated[str, "Current date in yyyy-mm-dd format"],
     ):
         """
-        Retrieve the latest fundamental information about a given stock on a given date by using OpenAI's news API.
+        Retrieves a markdown table of key fundamental metrics for a given stock using OpenAI web search tool.
+
+        This tool instructs an LLM to perform a web search to find the latest available data for a predefined
+        set of financial metrics and return them in a simple, clean markdown table.
+
         Args:
-            ticker (str): Ticker of a company. e.g. AAPL, TSM
-            curr_date (str): Current date in yyyy-mm-dd format
+            ticker (str): The stock ticker symbol to look up (e.g., 'AAPL').
+            curr_date (str): The current date in yyyy-mm-dd format, used as a reference for the search.
+
         Returns:
-            str: A formatted string containing the latest fundamental information about the company on the given date.
+            str: A markdown-formatted table containing key fundamental metrics for the company.
         """
 
         openai_fundamentals_results = interface.get_fundamentals_openai(
@@ -417,3 +446,20 @@ class Toolkit:
         )
 
         return openai_fundamentals_results
+
+    @staticmethod
+    @tool
+    def get_company_profile_openai(
+        ticker: Annotated[str, "the company's ticker"],
+    ):
+        """
+        Retrieves a concise, factual summary of a company's business model, primary activities,
+        products/services, and revenue streams using an OpenAI web search tool.
+        Args:
+            ticker (str): The stock ticker symbol to look up (e.g., 'AAPL').
+        Returns:
+            str: A paragraph summarizing the company's business profile.
+        """
+        openai_profile_results = interface.get_company_profile_openai(ticker)
+
+        return openai_profile_results
